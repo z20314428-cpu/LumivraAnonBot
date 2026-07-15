@@ -1,65 +1,45 @@
-۱from aiogram import Bot, Dispatcher, F
-from aiogram.filters import CommandStart
-from aiogram.types import Message
-import asyncio
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+)
 
-from config import BOT_TOKEN, ADMIN_ID
-from database import add_user, get_user_by_code, get_user_code, is_blocked
-from utils import generate_code
-
-bot = Bot(BOT_TOKEN)
-dp = Dispatcher()
-
-waiting_reply = {}
+from config import BOT_TOKEN
+from database import init_db, add_user
 
 
-@dp.message(CommandStart())
-async def start(message: Message):
-    user = message.from_user.id
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
 
-    if is_blocked(user):
-        await message.answer("❌ شما مسدود شده‌اید.")
-        return
+    add_user(
+        telegram_id=user.id,
+        username=user.username,
+        first_name=user.first_name,
+    )
 
-    data = get_user_code(user)
+    await update.message.reply_text(
+        f"""👋 سلام {user.first_name}
 
-    if data is None:
-        code = generate_code()
-        add_user(user, code)
-    else:
-        code = data[0]
+به LumivraAnonBot خوش اومدی.
 
-    link = f"https://t.me/{(await bot.get_me()).username}?start={code}"
+بات با موفقیت راه‌اندازی شد.
 
-    await message.answer(
-        f"""سلام 🌹
-
-لینک ناشناس اختصاصی شما:
-
-{link}
-
-این لینک را در کانال یا بیو قرار بده تا دیگران ناشناس برایت پیام بفرستند."""
+🚀 نسخه حرفه‌ای در حال تکمیل است..."""
     )
 
 
-@dp.message(F.text.startswith("/start "))
-async def anonymous(message: Message):
-    sender = message.from_user.id
+def main():
+    init_db()
 
-    if is_blocked(sender):
-        return
+    app = Application.builder().token(BOT_TOKEN).build()
 
-    code = message.text.split()[1]
+    app.add_handler(CommandHandler("start", start))
 
-    user = get_user_by_code(code)
+    print("Bot Started...")
 
-    if not user:
-        await message.answer("لینک معتبر نیست.")
-        return
+    app.run_polling()
 
-    waiting_reply[sender] = user[0]
 
-    await message.answer(
-        "پیام خود را ارسال کنید."
-    )
-  
+if __name__ == "__main__":
+    main()
