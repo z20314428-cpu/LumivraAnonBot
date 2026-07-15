@@ -1,60 +1,51 @@
 import sqlite3
 
-conn = sqlite3.connect("database.db", check_same_thread=False)
-cursor = conn.cursor()
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS users(
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    telegram_id INTEGER UNIQUE,
-    code TEXT UNIQUE
-)
-""")
-
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS blocked(
-    telegram_id INTEGER UNIQUE
-)
-""")
-
-conn.commit()
+DB_NAME = "lumivra.db"
 
 
-def get_user_code(user_id):
-    cursor.execute(
-        "SELECT code FROM users WHERE telegram_id=?",
-        (user_id,)
+def get_connection():
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def init_db():
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        telegram_id INTEGER UNIQUE,
+        username TEXT,
+        first_name TEXT,
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
-    return cursor.fetchone()
+    """)
 
-
-def add_user(user_id, code):
-    cursor.execute(
-        "INSERT OR IGNORE INTO users(telegram_id,code) VALUES(?,?)",
-        (user_id, code)
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS anonymous_messages(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_id INTEGER,
+        receiver_id INTEGER,
+        message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
+    """)
+
     conn.commit()
+    conn.close()
 
 
-def get_user_by_code(code):
-    cursor.execute(
-        "SELECT telegram_id FROM users WHERE code=?",
-        (code,)
-    )
-    return cursor.fetchone()
+def add_user(telegram_id, username, first_name):
+    conn = get_connection()
+    cur = conn.cursor()
 
+    cur.execute("""
+    INSERT OR IGNORE INTO users
+    (telegram_id, username, first_name)
+    VALUES (?, ?, ?)
+    """, (telegram_id, username, first_name))
 
-def block(user_id):
-    cursor.execute(
-        "INSERT OR IGNORE INTO blocked VALUES(?)",
-        (user_id,)
-    )
     conn.commit()
-
-
-def is_blocked(user_id):
-    cursor.execute(
-        "SELECT * FROM blocked WHERE telegram_id=?",
-        (user_id,)
-    )
-    return cursor.fetchone() is not None
+    conn.close()
